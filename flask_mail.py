@@ -102,8 +102,9 @@ def sanitize_subject(subject, encoding='utf-8'):
 def sanitize_address(addr, encoding='utf-8'):
     if isinstance(addr, string_types):
         addr = parseaddr(force_text(addr))
+        print(addr)
+
     nm, addr = addr
-    print(addr)
     try:
         nm = Header(nm, encoding).encode()
     except UnicodeEncodeError:
