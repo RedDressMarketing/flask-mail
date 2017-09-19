@@ -102,8 +102,6 @@ def sanitize_subject(subject, encoding='utf-8'):
 def sanitize_address(addr, encoding='utf-8'):
     if isinstance(addr, string_types):
         addr = parseaddr(force_text(addr))
-        print(addr)
-
     nm, addr = addr
     try:
         nm = Header(nm, encoding).encode()
@@ -186,7 +184,7 @@ class Connection(object):
             message.date = time.time()
 
         if self.host:
-            self.host.sendmail(sanitize_address(envelope_from or message.sender),
+            self.host.sendmail(envelope_from or message.sender,
                                list(message.send_to),
                                message.as_bytes() if PY3 else message.as_string(),
                                message.mail_options,
