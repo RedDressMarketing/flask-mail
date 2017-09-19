@@ -184,7 +184,7 @@ class Connection(object):
             message.date = time.time()
 
         if self.host:
-            self.host.sendmail(envelope_from or message.sender),
+            self.host.sendmail(envelope_from or message.sender,
                                list(message.send_to),
                                message.as_bytes() if PY3 else message.as_string(),
                                message.mail_options,
