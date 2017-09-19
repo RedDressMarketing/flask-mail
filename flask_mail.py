@@ -103,7 +103,7 @@ def sanitize_address(addr, encoding='utf-8'):
     if isinstance(addr, string_types):
         addr = parseaddr(force_text(addr))
     nm, addr = addr
-
+    print(addr)
     try:
         nm = Header(nm, encoding).encode()
     except UnicodeEncodeError:
@@ -185,8 +185,8 @@ class Connection(object):
             message.date = time.time()
 
         if self.host:
-            self.host.sendmail(sanitize_address(envelope_from or message.sender),
-                               list(sanitize_addresses(message.send_to)),
+            self.host.sendmail(envelope_from or message.sender,
+                               list(message.send_to),
                                message.as_bytes() if PY3 else message.as_string(),
                                message.mail_options,
                                message.rcpt_options)
@@ -243,7 +243,6 @@ class Message(object):
     :param recipients: list of email addresses
     :param body: plain text message
     :param html: HTML message
-    :param alts: A dict or an iterable to go through dict() that contains multipart alternatives
     :param sender: email sender address, or **MAIL_DEFAULT_SENDER** by default
     :param cc: CC list
     :param bcc: BCC list
@@ -260,7 +259,6 @@ class Message(object):
                  recipients=None,
                  body=None,
                  html=None,
-                 alts=None,
                  sender=None,
                  cc=None,
                  bcc=None,
@@ -284,7 +282,6 @@ class Message(object):
         self.cc = cc or []
         self.bcc = bcc or []
         self.body = body
-        self.alts = dict(alts or {})
         self.html = html
         self.date = date
         self.msgId = make_msgid()
@@ -297,17 +294,6 @@ class Message(object):
     @property
     def send_to(self):
         return set(self.recipients) | set(self.bcc or ()) | set(self.cc or ())
-
-    @property
-    def html(self):
-        return self.alts.get('html')
-
-    @html.setter
-    def html(self, value):
-        if value is None:
-            self.alts.pop('html', None)
-        else:
-            self.alts['html'] = value
 
     def _mimetext(self, text, subtype='plain'):
         """Creates a MIMEText object with the given subtype (default: 'plain')
@@ -323,10 +309,10 @@ class Message(object):
 
         attachments = self.attachments or []
 
-        if len(attachments) == 0 and not self.alts:
+        if len(attachments) == 0 and not self.html:
             # No html content and zero attachments means plain text
             msg = self._mimetext(self.body)
-        elif len(attachments) > 0 and not self.alts:
+        elif len(attachments) > 0 and not self.html:
             # No html and at least one attachment means multipart
             msg = MIMEMultipart()
             msg.attach(self._mimetext(self.body))
@@ -335,25 +321,24 @@ class Message(object):
             msg = MIMEMultipart()
             alternative = MIMEMultipart('alternative')
             alternative.attach(self._mimetext(self.body, 'plain'))
-            for mimetype, content in self.alts.items():
-                alternative.attach(self._mimetext(content, mimetype))
+            alternative.attach(self._mimetext(self.html, 'html'))
             msg.attach(alternative)
 
         if self.subject:
-            msg['Subject'] = sanitize_subject(force_text(self.subject), encoding)
+            msg['Subject'] = sanitize_subject(force_text(self.subject))
 
-        msg['From'] = sanitize_address(self.sender, encoding)
-        msg['To'] = ', '.join(list(set(sanitize_addresses(self.recipients, encoding))))
+        msg['From'] = self.sender
+        msg['To'] = ', '.join(list(set(self.recipients)))
 
         msg['Date'] = formatdate(self.date, localtime=True)
         # see RFC 5322 section 3.6.4.
         msg['Message-ID'] = self.msgId
 
         if self.cc:
-            msg['Cc'] = ', '.join(list(set(sanitize_addresses(self.cc, encoding))))
+            msg['Cc'] = ', '.join(list(set(self.cc)))
 
         if self.reply_to:
-            msg['Reply-To'] = sanitize_address(self.reply_to, encoding)
+            msg['Reply-To'] = self.reply_to
 
         if self.extra_headers:
             for k, v in self.extra_headers.items():
@@ -383,7 +368,7 @@ class Message(object):
                          attachment.disposition,
                          filename=filename)
 
-            for key, value in attachment.headers.items():
+            for key, value in attachment.headers:
                 f.add_header(key, value)
 
             msg.attach(f)
